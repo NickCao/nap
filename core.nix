@@ -2,6 +2,7 @@
 , stdenvNoCC
 , fetchzip
 , fetchurl
+, writeText
 , linkFarm
 , mirror ? "https://arch-archive.tuna.tsinghua.edu.cn"
 , repo
@@ -32,25 +33,33 @@ let
     (builtins.filter
       (pair: (
         builtins.length pair == 2 &&
-        builtins.elem (builtins.elemAt pair 0) [ "%FILENAME%" "%SHA256SUM%" ]
+        builtins.elem (builtins.elemAt pair 0) [ "%FILENAME%" "%SHA256SUM%" "%PGPSIG%" ]
       ))
       (builtins.map
         (lib.strings.splitString "\n")
         (lib.strings.splitString "\n\n" desc))));
-  toDerivation = desc: {
-    name = desc.filename;
-    path = fetchurl {
-      name = "source";
-      url = "${mirror}/${date}/${repo}/os/x86_64/${desc.filename}";
-      sha256 = desc.sha256sum;
-    };
-  };
-  packages = linkFarm repo ((builtins.attrValues (builtins.mapAttrs
-    (name: value:
-      assert value == "directory";
-      toDerivation (parseDesc (builtins.readFile "${dbExtracted}/${name}/desc")))
-    (builtins.readDir dbExtracted))) ++ [
+  toDerivations = desc: [
+    {
+      name = desc.filename;
+      path = fetchurl {
+        name = "source";
+        url = "${mirror}/${date}/${repo}/os/x86_64/${desc.filename}";
+        sha256 = desc.sha256sum;
+      };
+    }
+    {
+      name = "${desc.filename}.sig";
+      path = writeText "source" desc.pgpsig;
+    }
+  ];
+  packages = linkFarm repo ((lib.flatten
+    (builtins.attrValues (builtins.mapAttrs
+      (name: value:
+        assert value == "directory";
+        toDerivations (parseDesc (builtins.readFile "${dbExtracted}/${name}/desc")))
+      (builtins.readDir dbExtracted)))) ++ [
     { name = "${repo}.db"; path = db; }
+    { name = "${repo}.db.tar.gz"; path = db; }
   ]);
 in
 packages
