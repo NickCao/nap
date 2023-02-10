@@ -1,4 +1,4 @@
-{ lib, fetchzip }:
+{ lib, fetchzip, fetchurl, linkFarm }:
 let
   db = fetchzip {
     url = "https://arch-archive.tuna.tsinghua.edu.cn/2023/02-06/core/os/x86_64/core.db.tar.gz";
@@ -21,10 +21,18 @@ let
       (builtins.map
         (lib.strings.splitString "\n")
         (lib.strings.splitString "\n\n" desc))));
-  packages = builtins.mapAttrs
+  toDerivation = desc: {
+    name = desc.filename;
+    path = fetchurl {
+      name = "source";
+      url = "https://arch-archive.tuna.tsinghua.edu.cn/2023/02-06/core/os/x86_64/${desc.filename}";
+      sha256 = desc.sha256sum;
+    };
+  };
+  packages = linkFarm "core" (builtins.attrValues (builtins.mapAttrs
     (name: value:
       assert value == "directory";
-      parseDesc (builtins.readFile "${db}/${name}/desc"))
-    (builtins.readDir db);
+      toDerivation (parseDesc (builtins.readFile "${db}/${name}/desc")))
+    (builtins.readDir db)));
 in
 packages
