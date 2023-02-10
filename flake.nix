@@ -10,17 +10,17 @@
           packages.core = pkgs.callPackage ./archlinux.nix {
             repo = "core";
             date = "2023/02-06";
-            hash = "sha256-RcVVXv56bmm6ZS2XBiXYBr4DqZFkCTBwc7F8JOIzsAM=";
+            hash = "sha256-a9B0GC8/j3JM+eewBDuH0C/zxoGGEX8hyHRjGZvlbog=";
           };
           packages.extra = pkgs.callPackage ./archlinux.nix {
             repo = "extra";
             date = "2023/02-06";
-            hash = "sha256-h2oYA85vMEkBiyCF1aU+NjP4dBhOGkeEGJrbXyWr2cA=";
+            hash = "sha256-a5Jvd6cRTY6JFXZJD2T47tZPVVFNZAjjCiPATknn9GU=";
           };
           packages.community = pkgs.callPackage ./archlinux.nix {
             repo = "community";
             date = "2023/02-06";
-            hash = "sha256-fiVQbySTYY9NeMC8eEXvJbquuFjvdE7Nzs0mcp74TGc=";
+            hash = "sha256-YVLp+rWqrjHfxedfgnsWj8WLvL0Ra9jQxrKqtCL7Y88=";
           };
         });
 }

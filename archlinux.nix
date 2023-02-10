@@ -1,7 +1,7 @@
 { lib
 , stdenvNoCC
-, fetchzip
 , fetchurl
+, fetchzip
 , writeText
 , linkFarm
 , mirror ? "https://arch-archive.tuna.tsinghua.edu.cn"
@@ -10,16 +10,16 @@
 , hash
 }:
 let
-  db = fetchurl {
+  db = fetchzip {
     url = "${mirror}/${date}/${repo}/os/x86_64/${repo}.db.tar.gz";
+    stripRoot = false;
     inherit hash;
   };
-  dbExtracted = stdenvNoCC.mkDerivation {
-    name = repo;
+  dbTarball = stdenvNoCC.mkDerivation {
+    name = "${repo}.db.tar.gz";
     src = db;
     buildCommand = ''
-      mkdir -p $out
-      tar -x -f $src -C $out
+      tar -c -z -f $out -C $src .
     '';
   };
   parseDesc = desc: lib.listToAttrs (builtins.map
@@ -56,10 +56,10 @@ let
     (builtins.attrValues (builtins.mapAttrs
       (name: value:
         assert value == "directory";
-        toDerivations (parseDesc (builtins.readFile "${dbExtracted}/${name}/desc")))
-      (builtins.readDir dbExtracted)))) ++ [
-    { name = "${repo}.db"; path = db; }
-    { name = "${repo}.db.tar.gz"; path = db; }
+        toDerivations (parseDesc (builtins.readFile "${db}/${name}/desc")))
+      (builtins.readDir db)))) ++ [
+    { name = "${repo}.db"; path = dbTarball; }
+    { name = "${repo}.db.tar.gz"; path = dbTarball; }
   ]);
 in
 packages
