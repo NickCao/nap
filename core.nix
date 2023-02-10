@@ -45,10 +45,12 @@ let
       sha256 = desc.sha256sum;
     };
   };
-  packages = linkFarm repo (builtins.attrValues (builtins.mapAttrs
+  packages = linkFarm repo ((builtins.attrValues (builtins.mapAttrs
     (name: value:
       assert value == "directory";
       toDerivation (parseDesc (builtins.readFile "${dbExtracted}/${name}/desc")))
-    (builtins.readDir dbExtracted)));
+    (builtins.readDir dbExtracted))) ++ [
+    { name = "${repo}.db"; path = db; }
+  ]);
 in
 packages
