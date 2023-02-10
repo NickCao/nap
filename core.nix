@@ -1,9 +1,17 @@
-{ lib, fetchzip, fetchurl, linkFarm }:
+{ lib
+, fetchzip
+, fetchurl
+, linkFarm
+, mirror ? "https://arch-archive.tuna.tsinghua.edu.cn"
+, repo
+, date
+, hash
+}:
 let
   db = fetchzip {
-    url = "https://arch-archive.tuna.tsinghua.edu.cn/2023/02-06/core/os/x86_64/core.db.tar.gz";
+    url = "${mirror}/${date}/${repo}/os/x86_64/${repo}.db.tar.gz";
     stripRoot = false;
-    hash = "sha256-a9B0GC8/j3JM+eewBDuH0C/zxoGGEX8hyHRjGZvlbog=";
+    inherit hash;
   };
   parseDesc = desc: lib.listToAttrs (builtins.map
     (pair: {
@@ -25,11 +33,11 @@ let
     name = desc.filename;
     path = fetchurl {
       name = "source";
-      url = "https://arch-archive.tuna.tsinghua.edu.cn/2023/02-06/core/os/x86_64/${desc.filename}";
+      url = "${mirror}/${date}/${repo}/os/x86_64/${desc.filename}";
       sha256 = desc.sha256sum;
     };
   };
-  packages = linkFarm "core" (builtins.attrValues (builtins.mapAttrs
+  packages = linkFarm repo (builtins.attrValues (builtins.mapAttrs
     (name: value:
       assert value == "directory";
       toDerivation (parseDesc (builtins.readFile "${db}/${name}/desc")))
