@@ -1,4 +1,5 @@
 { lib
+, stdenvNoCC
 , fetchzip
 , fetchurl
 , linkFarm
@@ -8,10 +9,17 @@
 , hash
 }:
 let
-  db = fetchzip {
+  db = fetchurl {
     url = "${mirror}/${date}/${repo}/os/x86_64/${repo}.db.tar.gz";
-    stripRoot = false;
     inherit hash;
+  };
+  dbExtracted = stdenvNoCC.mkDerivation {
+    name = repo;
+    src = db;
+    buildCommand = ''
+      mkdir -p $out
+      tar -x -f $src -C $out
+    '';
   };
   parseDesc = desc: lib.listToAttrs (builtins.map
     (pair: {
@@ -40,7 +48,7 @@ let
   packages = linkFarm repo (builtins.attrValues (builtins.mapAttrs
     (name: value:
       assert value == "directory";
-      toDerivation (parseDesc (builtins.readFile "${db}/${name}/desc")))
-    (builtins.readDir db)));
+      toDerivation (parseDesc (builtins.readFile "${dbExtracted}/${name}/desc")))
+    (builtins.readDir dbExtracted)));
 in
 packages

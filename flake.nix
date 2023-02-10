@@ -10,7 +10,7 @@
           packages.core = pkgs.callPackage ./core.nix {
             repo = "core";
             date = "2023/02-06";
-            hash = "sha256-a9B0GC8/j3JM+eewBDuH0C/zxoGGEX8hyHRjGZvlbog=";
+            hash = "sha256-RcVVXv56bmm6ZS2XBiXYBr4DqZFkCTBwc7F8JOIzsAM=";
           };
         });
 }
