@@ -3,10 +3,10 @@
 
 from argparse import ArgumentParser
 from requests import get
-from debian.deb822 import Release, Packages
-import lzma, json
+from debian.deb822 import Release
+import json
 
-parser = ArgumentParser(prog="debian")
+parser = ArgumentParser(prog="debian-release")
 parser.add_argument("--uri", default="https://mirrors.tuna.tsinghua.edu.cn/debian")
 parser.add_argument("--distribution", default="bookworm")
 parser.add_argument("--output", required=True)
