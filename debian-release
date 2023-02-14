@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 # reference: https://wiki.debian.org/DebianRepository/Format
+# TODO: handle diff
 
 from argparse import ArgumentParser
 from debian.deb822 import Release, Packages
+from pathlib import Path
 import requests
 import sqlite3
 import lzma
@@ -34,31 +36,29 @@ INSERT = "INSERT OR IGNORE INTO files VALUES (?, ?)"
 
 for distribution in args.distributions:
     # The file "dists/$DIST/InRelease" shall contain meta-information about the distribution and checksums for the indices
-    # TODO: verify gpg signature
-    inrelease = f"dists/{distribution}/InRelease"
-    r, n = fetch(args.uri, inrelease)
-    cur.execute(INSERT, (inrelease, n))
+    inrelease = Path("dists", distribution, "InRelease")
+    r, n = fetch(args.uri, str(inrelease))
+    cur.execute(INSERT, (str(inrelease), n))
     release = Release(r)
     # TODO: handle legacy mirrors
     assert release["Acquire-By-Hash"] == "yes"
 
     # handle toplevel files
     for entry in release["SHA256"]:
-        cur.execute(INSERT, (f'dists/{distribution}/{entry["name"]}', entry["sha256"]))
+        fullpath = Path("dists", distribution, entry["name"])
+        cur.execute(INSERT, (str(fullpath), entry["sha256"]))
         # handle packages
-        for component in release["Components"].split(" "):
-            for architecture in release["Architectures"].split(" "):
-                if entry["name"] == f"{component}/binary-{architecture}/Packages.xz":
-                    byhash = f'dists/{distribution}/{component}/binary-{architecture}/by-hash/SHA256/{entry["sha256"]}'
-                    cur.execute(INSERT, (byhash, entry["sha256"]))
-                    p, m = fetch(args.uri, byhash)
-                    assert m == entry["SHA256"]
-                    data = [
-                        (package["Filename"], package["SHA256"])
-                        for package in Packages.iter_paragraphs(
-                            lzma.decompress(p), use_apt_pkg=False
-                        )
-                    ]
-                    cur.executemany(INSERT, data)
+        if fullpath.name == "Packages.xz":
+            byhash = fullpath.parent.joinpath("by-hash", "SHA256", entry["sha256"])
+            cur.execute(INSERT, (str(byhash), entry["sha256"]))
+            p, m = fetch(args.uri, str(byhash))
+            assert m == entry["SHA256"]
+            data = [
+                (package["Filename"], package["SHA256"])
+                for package in Packages.iter_paragraphs(
+                    lzma.decompress(p), use_apt_pkg=False
+                )
+            ]
+            cur.executemany(INSERT, data)
 con.commit()
 con.close()
