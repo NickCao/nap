@@ -2,19 +2,23 @@
 
 from argparse import ArgumentParser
 from debian.deb822 import Packages
+from collections import ChainMap
 import lzma
+import json
 
 parser = ArgumentParser(prog="debian-packages")
-parser.add_argument("--input", required=True)
+parser.add_argument("inputs", nargs="*")
 parser.add_argument("--output", required=True)
 args = parser.parse_args()
 
-with lzma.open(args.input) as i:
-    with open(args.output, "w") as o:
-        o.write("{ uri, fetchurl }: [\n")
-        for package in Packages.iter_paragraphs(i, use_apt_pkg=False):
-            o.write(f"""  (let filename = "{package['Filename']}"; in {{\n""")
-            o.write(f"""    name = filename;\n""")
-            o.write(f"""    path = fetchurl {{ url = "${{uri}}/${{filename}}"; sha256 = "{package['SHA256']}"; }};\n""")
-            o.write(f"""  }})\n""")
-        o.write("]\n")
+data = ChainMap()
+
+for file in args.inputs:
+    with lzma.open(file) as f:
+        data |= {
+            package["Filename"]: package["SHA256"]
+            for package in Packages.iter_paragraphs(f, use_apt_pkg=False)
+        }
+
+with open(args.output, "w") as f:
+    json.dump(dict(data), f)
