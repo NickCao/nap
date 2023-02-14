@@ -22,8 +22,11 @@ cur.execute("CREATE TABLE files(filename TEXT PRIMARY KEY, sha256 TEXT)")
 INSERT = "INSERT OR IGNORE INTO files VALUES (?, ?)"
 # fetch release
 # TODO: verify gpg signature
-r = get(f"{args.uri}/dists/{args.distribution}/Release")
+r = get(f"{args.uri}/dists/{args.distribution}/InRelease")
 r.raise_for_status()
+n = hashlib.sha256()
+n.update(r.content)
+cur.execute(INSERT, (f"dists/{args.distribution}/InRelease", n.hexdigest()))
 release = Release(r.text)
 # TODO: handle legacy mirrors
 assert release["Acquire-By-Hash"] == "yes"
