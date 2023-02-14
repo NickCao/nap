@@ -18,14 +18,18 @@ parser.add_argument("distributions", nargs="+")
 args = parser.parse_args()
 
 
-def fetch(uri: str, filename: Path) -> Tuple[bytes, str]:
+def fetch(uri: str, filename: Path, sha256: str | None = None) -> Tuple[bytes, str]:
     resp = requests.get(f"{uri}/{filename}")
     resp.raise_for_status()
 
-    sha256 = hashlib.sha256()
-    sha256.update(resp.content)
+    hasher = hashlib.sha256()
+    hasher.update(resp.content)
+    digest = hasher.hexdigest()
 
-    return resp.content, sha256.hexdigest()
+    if (sha256 is not None) and (sha256 != digest):
+        raise Exception("hash mismatch")
+
+    return resp.content, digest
 
 
 # open database connection
@@ -52,8 +56,7 @@ for distribution in args.distributions:
         if fullpath.name == "Packages.xz":
             byhash = fullpath.parent.joinpath("by-hash", "SHA256", entry["sha256"])
             cur.execute(INSERT, (str(byhash), entry["sha256"]))
-            p, m = fetch(args.uri, byhash)
-            assert m == entry["SHA256"]
+            p, _ = fetch(args.uri, byhash, entry["SHA256"])
             data = [
                 (package["Filename"], package["SHA256"])
                 for package in Packages.iter_paragraphs(
