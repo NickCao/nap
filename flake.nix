@@ -22,5 +22,8 @@
             date = "2023/02-06";
             hash = "sha256-YVLp+rWqrjHfxedfgnsWj8WLvL0Ra9jQxrKqtCL7Y88=";
           };
+          packages.bookworm = pkgs.callPackage ./debian.nix {
+            releaseFile = ./data/bookworm.json;
+          };
         });
 }
