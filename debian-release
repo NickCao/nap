@@ -6,6 +6,7 @@ from requests import get
 from debian.deb822 import Release, Packages
 import sqlite3
 import lzma
+import hashlib
 
 parser = ArgumentParser(prog="debian-release")
 parser.add_argument("--uri", default="https://mirrors.tuna.tsinghua.edu.cn/debian")
@@ -37,6 +38,9 @@ for entry in release["SHA256"]:
                     f"{args.uri}/dists/{args.distribution}/{component}/binary-{architecture}/by-hash/SHA256/{entry['sha256']}"
                 )
                 p.raise_for_status()
+                m = hashlib.sha256()
+                m.update(p.content)
+                assert m.hexdigest() == entry["SHA256"]
                 data = [
                     (package["Filename"], package["SHA256"])
                     for package in Packages.iter_paragraphs(
