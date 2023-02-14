@@ -2,8 +2,8 @@
 # reference: https://wiki.debian.org/DebianRepository/Format
 
 from argparse import ArgumentParser
-from requests import get
 from debian.deb822 import Release, Packages
+import requests
 import sqlite3
 import lzma
 import hashlib
@@ -13,6 +13,17 @@ parser.add_argument("--uri", default="https://mirrors.tuna.tsinghua.edu.cn/debia
 parser.add_argument("--output", required=True)
 parser.add_argument("distributions", nargs="+")
 args = parser.parse_args()
+
+
+def fetch(uri, filename):
+    resp = requests.get(f"{uri}/{filename}")
+    resp.raise_for_status()
+
+    sha256 = hashlib.sha256()
+    sha256.update(resp.content)
+
+    return resp.content, sha256.hexdigest()
+
 
 # open database connection
 con = sqlite3.connect(args.output)
@@ -25,14 +36,12 @@ for distribution in args.distributions:
     # fetch release
     # TODO: verify gpg signature
     inrelease = f"dists/{distribution}/InRelease"
-    r = get(f"{args.uri}/{inrelease}")
-    r.raise_for_status()
-    n = hashlib.sha256()
-    n.update(r.content)
-    cur.execute(INSERT, (inrelease, n.hexdigest()))
-    release = Release(r.text)
+    r, n = fetch(args.uri, inrelease)
+    cur.execute(INSERT, (inrelease, n))
+    release = Release(r)
     # TODO: handle legacy mirrors
     assert release["Acquire-By-Hash"] == "yes"
+
     # handle toplevel files
     for entry in release["SHA256"]:
         cur.execute(INSERT, (f'dists/{distribution}/{entry["name"]}', entry["sha256"]))
@@ -42,15 +51,12 @@ for distribution in args.distributions:
                 if entry["name"] == f"{component}/binary-{architecture}/Packages.xz":
                     byhash = f'dists/{distribution}/{component}/binary-{architecture}/by-hash/SHA256/{entry["sha256"]}'
                     cur.execute(INSERT, (byhash, entry["sha256"]))
-                    p = get(f"{args.uri}/{byhash}")
-                    p.raise_for_status()
-                    m = hashlib.sha256()
-                    m.update(p.content)
-                    assert m.hexdigest() == entry["SHA256"]
+                    p, m = fetch(args.uri, byhash)
+                    assert m == entry["SHA256"]
                     data = [
                         (package["Filename"], package["SHA256"])
                         for package in Packages.iter_paragraphs(
-                            lzma.decompress(p.content), use_apt_pkg=False
+                            lzma.decompress(p), use_apt_pkg=False
                         )
                     ]
                     cur.executemany(INSERT, data)
