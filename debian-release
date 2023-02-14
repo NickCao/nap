@@ -5,6 +5,7 @@
 from argparse import ArgumentParser
 from debian.deb822 import Release, Packages
 from pathlib import Path
+from typing import Tuple
 import requests
 import sqlite3
 import lzma
@@ -17,7 +18,7 @@ parser.add_argument("distributions", nargs="+")
 args = parser.parse_args()
 
 
-def fetch(uri, filename):
+def fetch(uri: str, filename: Path) -> Tuple[bytes, str]:
     resp = requests.get(f"{uri}/{filename}")
     resp.raise_for_status()
 
@@ -37,7 +38,7 @@ INSERT = "INSERT OR IGNORE INTO files VALUES (?, ?)"
 for distribution in args.distributions:
     # The file "dists/$DIST/InRelease" shall contain meta-information about the distribution and checksums for the indices
     inrelease = Path("dists", distribution, "InRelease")
-    r, n = fetch(args.uri, str(inrelease))
+    r, n = fetch(args.uri, inrelease)
     cur.execute(INSERT, (str(inrelease), n))
     release = Release(r)
     # TODO: handle legacy mirrors
@@ -51,7 +52,7 @@ for distribution in args.distributions:
         if fullpath.name == "Packages.xz":
             byhash = fullpath.parent.joinpath("by-hash", "SHA256", entry["sha256"])
             cur.execute(INSERT, (str(byhash), entry["sha256"]))
-            p, m = fetch(args.uri, str(byhash))
+            p, m = fetch(args.uri, byhash)
             assert m == entry["SHA256"]
             data = [
                 (package["Filename"], package["SHA256"])
