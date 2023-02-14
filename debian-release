@@ -29,14 +29,14 @@ release = Release(r.text)
 assert release["Acquire-By-Hash"] == "yes"
 # handle toplevel files
 for entry in release["SHA256"]:
-    cur.execute(INSERT, (entry["name"], entry["sha256"]))
+    cur.execute(INSERT, (f'dists/{args.distribution}/{entry["name"]}', entry["sha256"]))
     # handle packages
     for component in release["Components"].split(" "):
         for architecture in release["Architectures"].split(" "):
             if entry["name"] == f"{component}/binary-{architecture}/Packages.xz":
-                p = get(
-                    f"{args.uri}/dists/{args.distribution}/{component}/binary-{architecture}/by-hash/SHA256/{entry['sha256']}"
-                )
+                byhash = f'dists/{args.distribution}/{component}/binary-{architecture}/by-hash/SHA256/{entry["sha256"]}'
+                cur.execute(INSERT, (byhash, entry["sha256"]))
+                p = get(f"{args.uri}/{byhash}")
                 p.raise_for_status()
                 m = hashlib.sha256()
                 m.update(p.content)
