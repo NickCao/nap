@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 # reference: https://wiki.debian.org/DebianRepository/Format
-# TODO: handle diff
 
 from __future__ import annotations
 from argparse import ArgumentParser
@@ -12,12 +11,6 @@ import sqlite3
 import lzma
 import hashlib
 import csv
-
-parser = ArgumentParser(prog="debian-release")
-parser.add_argument("--uri", default="https://mirrors.tuna.tsinghua.edu.cn/debian")
-parser.add_argument("--output", required=True)
-parser.add_argument("dists", nargs="+")
-args = parser.parse_args()
 
 
 class Entry:
@@ -135,53 +128,60 @@ def packages(cur: sqlite3.Cursor, uri: str, entry: Entry):
     register(cur, data)
 
 
-# open database connection
-con = sqlite3.connect(args.output)
-cur = con.cursor()
-# create mapping table
-cur.execute("CREATE TABLE files(filename TEXT PRIMARY KEY, sha256 TEXT)")
-INSERT = "INSERT OR IGNORE INTO files VALUES (?, ?)"
+if __name__ == "__main__":
+    parser = ArgumentParser(prog="debian-release")
+    parser.add_argument("--uri", default="https://mirrors.tuna.tsinghua.edu.cn/debian")
+    parser.add_argument("--output", required=True)
+    parser.add_argument("dists", nargs="+")
+    args = parser.parse_args()
 
-for dist in args.dists:
-    release = inrelease(cur, args.uri, dist)
+    # open database connection
+    con = sqlite3.connect(args.output)
+    cur = con.cursor()
+    # create mapping table
+    cur.execute("CREATE TABLE files(filename TEXT PRIMARY KEY, sha256 TEXT)")
+    INSERT = "INSERT OR IGNORE INTO files VALUES (?, ?)"
 
-    # handle toplevel files
-    for entry in release:
-        match entry.filename.name:
-            case (
-                # legacy per-component-and-architecture Release files
-                "Release"
-                # already handed by their compressed counterparts
-                | "Packages"
-                | "Sources"
-                # already handled by their sha256 counterparts
-                | "MD5SUMS"
-            ):
-                pass
-            case "Packages.gz" | "Sources.gz":
-                register(cur, [entry.byhash()])
-            # installer image sums
-            case "SHA256SUMS":
-                installer(cur, args.uri, entry)
-            case "Index":
-                diff(cur, args.uri, entry)
-            case "Sources.xz":
-                sources(cur, args.uri, entry)
-            case "Packages.xz":
-                packages(cur, args.uri, entry)
-            case _:
-                # "Contents" indices
-                if entry.filename.name.startswith("Contents"):
+    for dist in args.dists:
+        release = inrelease(cur, args.uri, dist)
+
+        # handle toplevel files
+        for entry in release:
+            match entry.filename.name:
+                case (
+                    # legacy per-component-and-architecture Release files
+                    "Release"
+                    # already handed by their compressed counterparts
+                    | "Packages"
+                    | "Sources"
+                    # already handled by their sha256 counterparts
+                    | "MD5SUMS"
+                ):
                     pass
-                # "Translation" indices
-                elif entry.filename.name.startswith("Translation"):
-                    pass
-                # https://wiki.debian.org/DEP-11
-                elif entry.filename.name.startswith("Components"):
-                    pass
-                elif entry.filename.name.startswith("icons"):
-                    pass
-                else:
-                    raise Exception("unhandled file")
-con.commit()
-con.close()
+                case "Packages.gz" | "Sources.gz":
+                    register(cur, [entry.byhash()])
+                # installer image sums
+                case "SHA256SUMS":
+                    installer(cur, args.uri, entry)
+                case "Index":
+                    diff(cur, args.uri, entry)
+                case "Sources.xz":
+                    sources(cur, args.uri, entry)
+                case "Packages.xz":
+                    packages(cur, args.uri, entry)
+                case _:
+                    # "Contents" indices
+                    if entry.filename.name.startswith("Contents"):
+                        pass
+                    # "Translation" indices
+                    elif entry.filename.name.startswith("Translation"):
+                        pass
+                    # https://wiki.debian.org/DEP-11
+                    elif entry.filename.name.startswith("Components"):
+                        pass
+                    elif entry.filename.name.startswith("icons"):
+                        pass
+                    else:
+                        raise Exception("unhandled file")
+    con.commit()
+    con.close()
