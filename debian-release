@@ -11,6 +11,7 @@ import sqlite3
 import lzma
 import hashlib
 import csv
+import logging
 
 
 class Entry:
@@ -18,8 +19,8 @@ class Entry:
         self.filename = filename
         self.sha256 = sha256
 
-    def __repr__(self):
-        return f"Entry({self.filename}, {self.sha256})"
+    def __repr__(self) -> str:
+        return str(self.filename)
 
     def byhash(self) -> Entry:
         return Entry(
@@ -52,6 +53,7 @@ def register(cur: sqlite3.Cursor, entries: list[Entry]):
 def inrelease(cur: sqlite3.Cursor, uri: str, dist: str) -> list[Entry]:
     # The file "dists/$DIST/InRelease" shall contain meta-information about the distribution and checksums for the indices
     filename = Path("dists", dist, "InRelease")
+    logging.info(f"InRelease:{filename}")
 
     file = requests.get(f"{uri}/{filename}")
     file.raise_for_status()
@@ -73,6 +75,8 @@ def inrelease(cur: sqlite3.Cursor, uri: str, dist: str) -> list[Entry]:
 
 
 def installer(cur: sqlite3.Cursor, uri: str, entry: Entry):
+    logging.info(f"SHA256SUMS:{entry}")
+
     content = fetch(uri, entry)
     data = [
         Entry(entry.filename.parent.joinpath(row[2]), row[0])
@@ -82,6 +86,8 @@ def installer(cur: sqlite3.Cursor, uri: str, entry: Entry):
 
 
 def diff(cur: sqlite3.Cursor, uri: str, entry: Entry):
+    logging.info(f".diff/Index:{entry}")
+
     byhash = entry.byhash()
     register(cur, [byhash])
 
@@ -99,6 +105,8 @@ def diff(cur: sqlite3.Cursor, uri: str, entry: Entry):
 
 
 def sources(cur: sqlite3.Cursor, uri: str, entry: Entry):
+    logging.info(f"Sources:{entry}")
+
     byhash = entry.byhash()
     register(cur, [byhash])
 
@@ -114,6 +122,8 @@ def sources(cur: sqlite3.Cursor, uri: str, entry: Entry):
 
 
 def packages(cur: sqlite3.Cursor, uri: str, entry: Entry):
+    logging.info(f"Packages:{entry}")
+
     byhash = entry.byhash()
     register(cur, [byhash])
 
@@ -129,6 +139,8 @@ def packages(cur: sqlite3.Cursor, uri: str, entry: Entry):
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+
     parser = ArgumentParser(prog="debian-release")
     parser.add_argument("--uri", default="https://mirrors.tuna.tsinghua.edu.cn/debian")
     parser.add_argument("--output", required=True)
