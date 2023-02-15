@@ -14,6 +14,7 @@ import csv
 import logging
 import xml
 
+
 def sha256sum(data: bytes) -> str:
     hasher = hashlib.sha256()
     hasher.update(data)
@@ -38,18 +39,5 @@ for data in root.findall("repo:data", ns):
             resp.raise_for_status()
             con = sqlite3.connect(":memory:")
             con.deserialize(lzma.decompress(resp.content))
-        case "filelists_db":
-            resp = requests.get(f"{uri}/{filename}")
-            resp.raise_for_status()
-            con = sqlite3.connect(":memory:")
-            con.deserialize(lzma.decompress(resp.content))
-        case "other_db":
-            resp = requests.get(f"{uri}/{filename}")
-            resp.raise_for_status()
-            con = sqlite3.connect(":memory:")
-            con.deserialize(lzma.decompress(resp.content))
         case _:
-            pass
-
-    print(filename)
-    print(checksum)
+            print(filename, checksum)
