@@ -21,9 +21,12 @@ args = parser.parse_args()
 
 
 class Entry:
-    def __init__(self, filename, sha256):
+    def __init__(self, filename: Path, sha256: str):
         self.filename = filename
         self.sha256 = sha256
+
+    def __repr__(self):
+        return f"Entry({self.filename}, {self.sha256})"
 
     def byhash(self) -> Entry:
         return Entry(
@@ -82,8 +85,6 @@ INSERT = "INSERT OR IGNORE INTO files VALUES (?, ?)"
 
 for dist in args.dists:
     release = inrelease(cur, args.uri, dist)
-    print(release)
-    exit(0)
     register(cur, release)
 
     # handle toplevel files
