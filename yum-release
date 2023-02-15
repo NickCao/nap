@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# reference: https://wiki.debian.org/DebianRepository/Format
+# reference: https://www.jfrog.com/confluence/display/JFROG/RPM+Repositories
 
 from __future__ import annotations
 from argparse import ArgumentParser
