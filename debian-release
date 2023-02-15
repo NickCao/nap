@@ -3,7 +3,7 @@
 # TODO: handle diff
 
 from argparse import ArgumentParser
-from debian.deb822 import Release, Packages
+from debian.deb822 import Release, Sources, Packages
 from pathlib import Path
 from typing import Tuple
 import requests
@@ -66,9 +66,17 @@ for distribution in args.distributions:
             case "Index":
                 pass
             case "Sources.xz":
+                byhash = fullpath.parent.joinpath("by-hash", "SHA256", entry["sha256"])
+                cur.execute(INSERT, (str(byhash), entry["sha256"]))
+                p, _ = fetch(args.uri, byhash, entry["SHA256"])
+                for source in Sources.iter_paragraphs(
+                    lzma.decompress(p), use_apt_pkg=False
+                    ):
+                    pass
+                    #print(source["Checksums-Sha256"], source["Directory"])
                 # TODO: handle sources
-                pass
             case "Packages.xz":
+                continue
                 byhash = fullpath.parent.joinpath("by-hash", "SHA256", entry["sha256"])
                 cur.execute(INSERT, (str(byhash), entry["sha256"]))
                 p, _ = fetch(args.uri, byhash, entry["SHA256"])
