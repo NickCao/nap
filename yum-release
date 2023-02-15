@@ -1,0 +1,29 @@
+#!/usr/bin/env python3
+# reference: https://wiki.debian.org/DebianRepository/Format
+
+from __future__ import annotations
+from argparse import ArgumentParser
+from pathlib import Path
+from typing import Tuple, TypedDict, Optional
+import xml.etree.ElementTree as ET
+import requests
+import sqlite3
+import lzma
+import hashlib
+import csv
+import logging
+import xml
+
+uri = "https://mirrors.tuna.tsinghua.edu.cn/centos-stream/9-stream/BaseOS/x86_64/os"
+resp = requests.get(f"{uri}/repodata/repomd.xml")
+resp.raise_for_status()
+
+ns = {"repo": "http://linux.duke.edu/metadata/repo"}
+root = ET.fromstring(resp.text)
+
+for data in root.findall("repo:data", ns):
+    location = data.find("repo:location", ns)
+    checksum = data.find("repo:checksum", ns)
+    print(data.get("type"))
+    print(location.get("href"))
+    print(checksum.text)
