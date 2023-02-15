@@ -10,6 +10,7 @@ import requests
 import sqlite3
 import lzma
 import hashlib
+import csv
 
 parser = ArgumentParser(prog="debian-release")
 parser.add_argument("--uri", default="https://mirrors.tuna.tsinghua.edu.cn/debian")
@@ -67,8 +68,9 @@ for distribution in args.distributions:
                 pass
             # installer image sums
             case "SHA256SUMS":
-                # TODO: handle installer images
-                pass
+                p, _ = fetch(args.uri, fullpath, entry["SHA256"])
+                for row in csv.reader(p.decode("utf-8").splitlines(), delimiter=" "):
+                    cur.execute(INSERT, (str(fullpath.parent.joinpath(row[2])), row[0]))
             case "Index":
                 byhash = fullpath.parent.joinpath("by-hash", "SHA256", entry["sha256"])
                 cur.execute(INSERT, (str(byhash), entry["sha256"]))
