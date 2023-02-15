@@ -2,10 +2,11 @@
 # reference: https://wiki.debian.org/DebianRepository/Format
 # TODO: handle diff
 
+from __future__ import annotations
 from argparse import ArgumentParser
 from debian.deb822 import Release, Sources, Packages, PdiffIndex
 from pathlib import Path
-from typing import Tuple
+from typing import Tuple, TypedDict, Optional
 import requests
 import sqlite3
 import lzma
@@ -19,22 +20,57 @@ parser.add_argument("dists", nargs="+")
 args = parser.parse_args()
 
 
-def fetch(uri: str, filename: Path, sha256: str | None = None) -> Tuple[bytes, str]:
-    resp = requests.get(f"{uri}/{filename}")
+class Entry:
+    def __init__(self, filename, sha256):
+        self.filename = filename
+        self.sha256 = sha256
+
+    def byhash(self) -> Entry:
+        return Entry(
+            self.filename.parent.joinpath("by-hash", "SHA256", self.sha256), self.sha256
+        )
+
+
+def sha256sum(data: bytes) -> str:
+    hasher = hashlib.sha256()
+    hasher.update(data)
+    return hasher.hexdigest()
+
+
+def fetch(uri: str, entry: Entry) -> bytes:
+    resp = requests.get(f"{uri}/{entry.filename}")
     resp.raise_for_status()
 
-    hasher = hashlib.sha256()
-    hasher.update(resp.content)
-    digest = hasher.hexdigest()
+    digest = sha256sum(resp.content)
 
-    if (sha256 is not None) and (sha256 != digest):
+    if entry.sha256 != digest:
         raise Exception("hash mismatch")
 
-    return resp.content, digest
+    return resp.content
 
 
-def register(cur: sqlite3.Cursor, entries: list[Tuple[Path, str]]):
-    cur.executemany(INSERT, [(str(path), sha256) for path, sha256 in entries])
+def register(cur: sqlite3.Cursor, entries: list[Entry]):
+    cur.executemany(INSERT, [(str(entry.filename), entry.sha256) for entry in entries])
+
+
+def inrelease(cur: sqlite3.Cursor, uri: str, dist: str) -> list[Entry]:
+    # The file "dists/$DIST/InRelease" shall contain meta-information about the distribution and checksums for the indices
+    filename = Path("dists", dist, "InRelease")
+
+    file = requests.get(f"{uri}/{filename}")
+    file.raise_for_status()
+
+    # TODO: verify OpenPGP signature
+    register(cur, [Entry(filename, sha256sum(file.content))])
+
+    release = Release(file.content)
+    if release["Acquire-By-Hash"] != "yes":
+        raise Exception("Acquire-By-Hash support is required")
+
+    return [
+        Entry(filename.parent.joinpath(file["name"]), file["sha256"])
+        for file in release["SHA256"]
+    ]
 
 
 # open database connection
@@ -45,19 +81,12 @@ cur.execute("CREATE TABLE files(filename TEXT PRIMARY KEY, sha256 TEXT)")
 INSERT = "INSERT OR IGNORE INTO files VALUES (?, ?)"
 
 for dist in args.dists:
-    # The file "dists/$DIST/InRelease" shall contain meta-information about the distribution and checksums for the indices
-    # TODO: verify OpenPGP signature
-    inrelease = Path("dists", dist, "InRelease")
-    r, n = fetch(args.uri, inrelease)
-    register(cur, [(inrelease, n)])
-    release = Release(r)
-    # TODO: handle legacy mirrors
-    assert release["Acquire-By-Hash"] == "yes"
+    release = inrelease(cur, args.uri, dist)
+    register(cur, release)
 
     # handle toplevel files
-    for entry in release["SHA256"]:
-        fullpath = inrelease.parent.joinpath(entry["name"])
-        register(cur, [(fullpath, entry["sha256"])])
+    for entry in release:
+        fullpath = entry.filename
         match fullpath.name:
             case (
                 # legacy per-component-and-architecture Release files
@@ -73,16 +102,16 @@ for dist in args.dists:
                 pass
             # installer image sums
             case "SHA256SUMS":
-                p, _ = fetch(args.uri, fullpath, entry["SHA256"])
+                p = fetch(args.uri, entry)
                 for row in csv.reader(p.decode("utf-8").splitlines(), delimiter=" "):
-                    register(cur, [(fullpath.parent.joinpath(row[2]), row[0])])
+                    register(cur, [Entry(fullpath.parent.joinpath(row[2]), row[0])])
             case "Index":
-                byhash = fullpath.parent.joinpath("by-hash", "SHA256", entry["sha256"])
-                register(cur, [(byhash, entry["sha256"])])
-                p, _ = fetch(args.uri, byhash, entry["SHA256"])
+                byhash = entry.byhash()
+                register(cur, [byhash])
+                p = fetch(args.uri, byhash)
                 for diff in PdiffIndex.iter_paragraphs(p, use_apt_pkg=False):
                     data = [
-                        (
+                        Entry(
                             fullpath.parent.joinpath(file["filename"]),
                             file["SHA256"],
                         )
@@ -90,24 +119,23 @@ for dist in args.dists:
                     ]
                     register(cur, data)
             case "Sources.xz":
-                byhash = fullpath.parent.joinpath("by-hash", "SHA256", entry["sha256"])
-                register(cur, [(byhash, entry["sha256"])])
-                p, _ = fetch(args.uri, byhash, entry["SHA256"])
+                byhash = entry.byhash()
+                register(cur, [byhash])
+                p = fetch(args.uri, byhash)
                 for source in Sources.iter_paragraphs(
                     lzma.decompress(p), use_apt_pkg=False
                 ):
                     directory = Path(source["Directory"])
                     data = [
-                        (directory.joinpath(file["name"]), file["sha256"])
+                        Entry(directory.joinpath(file["name"]), file["sha256"])
                         for file in source["Checksums-Sha256"]
                     ]
                     register(cur, data)
             case "Packages.xz":
-                byhash = fullpath.parent.joinpath("by-hash", "SHA256", entry["sha256"])
-                register(cur, [(byhash, entry["sha256"])])
-                p, _ = fetch(args.uri, byhash, entry["SHA256"])
+                byhash = entry.byhash()
+                p = fetch(args.uri, byhash)
                 data = [
-                    (Path(package["Filename"]), package["SHA256"])
+                    Entry(Path(package["Filename"]), package["SHA256"])
                     for package in Packages.iter_paragraphs(
                         lzma.decompress(p), use_apt_pkg=False
                     )
