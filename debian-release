@@ -170,18 +170,7 @@ if __name__ == "__main__":
                 case "Packages.xz":
                     packages(cur, args.uri, entry)
                 case _:
-                    # "Contents" indices
-                    if entry.filename.name.startswith("Contents"):
-                        pass
-                    # "Translation" indices
-                    elif entry.filename.name.startswith("Translation"):
-                        pass
-                    # https://wiki.debian.org/DEP-11
-                    elif entry.filename.name.startswith("Components"):
-                        pass
-                    elif entry.filename.name.startswith("icons"):
-                        pass
-                    else:
-                        raise Exception("unhandled file")
+                    pass
+
     con.commit()
     con.close()
