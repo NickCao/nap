@@ -70,10 +70,13 @@ def inrelease(cur: sqlite3.Cursor, uri: str, dist: str) -> list[Entry]:
     if release["Acquire-By-Hash"] != "yes":
         raise Exception("Acquire-By-Hash support is required")
 
-    return [
+    data = [
         Entry(filename.parent.joinpath(file["name"]), file["sha256"])
         for file in release["SHA256"]
     ]
+    register(cur, data)
+
+    return data
 
 
 def installer(cur: sqlite3.Cursor, uri: str, entry: Entry):
@@ -141,7 +144,6 @@ INSERT = "INSERT OR IGNORE INTO files VALUES (?, ?)"
 
 for dist in args.dists:
     release = inrelease(cur, args.uri, dist)
-    register(cur, release)
 
     # handle toplevel files
     for entry in release:
