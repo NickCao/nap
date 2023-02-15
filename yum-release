@@ -8,7 +8,7 @@ from typing import Tuple, TypedDict, Optional
 import xml.etree.ElementTree as ET
 import requests
 import sqlite3
-import lzma
+import gzip
 import hashlib
 import csv
 import logging
@@ -29,7 +29,10 @@ if __name__ == "__main__":
     resp = requests.get(f"{args.uri}/repodata/repomd.xml")
     resp.raise_for_status()
 
-    ns = {"repo": "http://linux.duke.edu/metadata/repo"}
+    ns = {
+        "repo": "http://linux.duke.edu/metadata/repo",
+        "common": "http://linux.duke.edu/metadata/common",
+    }
     root = ET.fromstring(resp.text)
 
     con = sqlite3.connect(args.output)
@@ -46,15 +49,19 @@ if __name__ == "__main__":
         cur.execute(INSERT, (filename, checksum))
 
         match filetype:
-            case "primary_db":
+            case "primary":
                 resp = requests.get(f"{args.uri}/{filename}")
                 resp.raise_for_status()
 
-                src = sqlite3.connect(":memory:")
-                src.deserialize(lzma.decompress(resp.content))
-                csrc = src.cursor()
-                csrc.execute("SELECT location_href, pkgId FROM packages")
-                cur.executemany(INSERT, csrc.fetchall())
+                primary = ET.fromstring(gzip.decompress(resp.content).decode("utf-8"))
+                for package in primary.findall("common:package", ns):
+                    cur.execute(
+                        INSERT,
+                        (
+                            package.find("common:location", ns).get("href"),
+                            package.find("common:checksum", ns).text,
+                        ),
+                    )
             case _:
                 pass
 
