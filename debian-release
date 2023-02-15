@@ -3,7 +3,7 @@
 # TODO: handle diff
 
 from argparse import ArgumentParser
-from debian.deb822 import Release, Sources, Packages
+from debian.deb822 import Release, Sources, Packages, PdiffIndex
 from pathlib import Path
 from typing import Tuple
 import requests
@@ -53,18 +53,35 @@ for distribution in args.distributions:
         fullpath = inrelease.parent.joinpath(entry["name"])
         cur.execute(INSERT, (str(fullpath), entry["sha256"]))
         match fullpath.name:
-            # already handled by their xz counterparts
-            case "Packages" | "Packages.gz" | "Sources" | "Sources.gz":
-                pass
-            # legacy per arch Release
-            case "Release":
+            case (
+                # legacy per-component-and-architecture Release files
+                "Release"
+                # already handled by their xz counterparts
+                | "Packages"
+                | "Packages.gz"
+                | "Sources"
+                | "Sources.gz"
+                # already handled by their sha256 counterparts
+                | "MD5SUMS"
+            ):
                 pass
             # installer image sums
-            case "SHA256SUMS" | "MD5SUMS":
+            case "SHA256SUMS":
+                # TODO: handle installer images
                 pass
-            # diff index
             case "Index":
-                pass
+                byhash = fullpath.parent.joinpath("by-hash", "SHA256", entry["sha256"])
+                cur.execute(INSERT, (str(byhash), entry["sha256"]))
+                p, _ = fetch(args.uri, byhash, entry["SHA256"])
+                for diff in PdiffIndex.iter_paragraphs(p, use_apt_pkg=False):
+                    data = [
+                        (
+                            str(fullpath.parent.joinpath(file["filename"])),
+                            file["SHA256"],
+                        )
+                        for file in diff["SHA256-Download"]
+                    ]
+                    cur.executemany(INSERT, data)
             case "Sources.xz":
                 byhash = fullpath.parent.joinpath("by-hash", "SHA256", entry["sha256"])
                 cur.execute(INSERT, (str(byhash), entry["sha256"]))
