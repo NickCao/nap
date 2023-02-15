@@ -76,6 +76,16 @@ def inrelease(cur: sqlite3.Cursor, uri: str, dist: str) -> list[Entry]:
     ]
 
 
+def installer(cur: sqlite3.Cursor, entry: Entry):
+    content = fetch(args.uri, entry)
+    data = [
+        Entry(entry.filename.parent.joinpath(row[2]), row[0])
+        for row in csv.reader(content.decode("utf-8").splitlines(), delimiter=" ")
+    ]
+    print(data)
+    register(cur, data)
+
+
 # open database connection
 con = sqlite3.connect(args.output)
 cur = con.cursor()
@@ -103,11 +113,7 @@ for dist in args.dists:
                 register(cur, [entry.byhash()])
             # installer image sums
             case "SHA256SUMS":
-                p = fetch(args.uri, entry)
-                for row in csv.reader(p.decode("utf-8").splitlines(), delimiter=" "):
-                    register(
-                        cur, [Entry(entry.filename.parent.joinpath(row[2]), row[0])]
-                    )
+                installer(cur, entry)
             case "Index":
                 byhash = entry.byhash()
                 register(cur, [byhash])
