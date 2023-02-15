@@ -50,7 +50,7 @@ for distribution in args.distributions:
 
     # handle toplevel files
     for entry in release["SHA256"]:
-        fullpath = Path("dists", distribution, entry["name"])
+        fullpath = inrelease.parent.joinpath(entry["name"])
         cur.execute(INSERT, (str(fullpath), entry["sha256"]))
         match fullpath.name:
             # already handled by their xz counterparts
@@ -71,9 +71,9 @@ for distribution in args.distributions:
                 p, _ = fetch(args.uri, byhash, entry["SHA256"])
                 for source in Sources.iter_paragraphs(
                     lzma.decompress(p), use_apt_pkg=False
-                    ):
+                ):
                     pass
-                    #print(source["Checksums-Sha256"], source["Directory"])
+                    # print(source["Checksums-Sha256"], source["Directory"])
                 # TODO: handle sources
             case "Packages.xz":
                 continue
