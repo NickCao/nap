@@ -33,6 +33,10 @@ def fetch(uri: str, filename: Path, sha256: str | None = None) -> Tuple[bytes, s
     return resp.content, digest
 
 
+def register(cur: sqlite3.Cursor, entries: list[Tuple[Path, str]]):
+    cur.executemany(INSERT, [(str(path), sha256) for path, sha256 in entries])
+
+
 # open database connection
 con = sqlite3.connect(args.output)
 cur = con.cursor()
@@ -42,9 +46,10 @@ INSERT = "INSERT OR IGNORE INTO files VALUES (?, ?)"
 
 for dist in args.dists:
     # The file "dists/$DIST/InRelease" shall contain meta-information about the distribution and checksums for the indices
+    # TODO: verify OpenPGP signature
     inrelease = Path("dists", dist, "InRelease")
     r, n = fetch(args.uri, inrelease)
-    cur.execute(INSERT, (str(inrelease), n))
+    register(cur, [(inrelease, n)])
     release = Release(r)
     # TODO: handle legacy mirrors
     assert release["Acquire-By-Hash"] == "yes"
@@ -52,7 +57,7 @@ for dist in args.dists:
     # handle toplevel files
     for entry in release["SHA256"]:
         fullpath = inrelease.parent.joinpath(entry["name"])
-        cur.execute(INSERT, (str(fullpath), entry["sha256"]))
+        register(cur, [(fullpath, entry["sha256"])])
         match fullpath.name:
             case (
                 # legacy per-component-and-architecture Release files
@@ -70,44 +75,44 @@ for dist in args.dists:
             case "SHA256SUMS":
                 p, _ = fetch(args.uri, fullpath, entry["SHA256"])
                 for row in csv.reader(p.decode("utf-8").splitlines(), delimiter=" "):
-                    cur.execute(INSERT, (str(fullpath.parent.joinpath(row[2])), row[0]))
+                    register(cur, [(fullpath.parent.joinpath(row[2]), row[0])])
             case "Index":
                 byhash = fullpath.parent.joinpath("by-hash", "SHA256", entry["sha256"])
-                cur.execute(INSERT, (str(byhash), entry["sha256"]))
+                register(cur, [(byhash, entry["sha256"])])
                 p, _ = fetch(args.uri, byhash, entry["SHA256"])
                 for diff in PdiffIndex.iter_paragraphs(p, use_apt_pkg=False):
                     data = [
                         (
-                            str(fullpath.parent.joinpath(file["filename"])),
+                            fullpath.parent.joinpath(file["filename"]),
                             file["SHA256"],
                         )
                         for file in diff["SHA256-Download"]
                     ]
-                    cur.executemany(INSERT, data)
+                    register(cur, data)
             case "Sources.xz":
                 byhash = fullpath.parent.joinpath("by-hash", "SHA256", entry["sha256"])
-                cur.execute(INSERT, (str(byhash), entry["sha256"]))
+                register(cur, [(byhash, entry["sha256"])])
                 p, _ = fetch(args.uri, byhash, entry["SHA256"])
                 for source in Sources.iter_paragraphs(
                     lzma.decompress(p), use_apt_pkg=False
                 ):
                     directory = Path(source["Directory"])
                     data = [
-                        (str(directory.joinpath(file["name"])), file["sha256"])
+                        (directory.joinpath(file["name"]), file["sha256"])
                         for file in source["Checksums-Sha256"]
                     ]
-                    cur.executemany(INSERT, data)
+                    register(cur, data)
             case "Packages.xz":
                 byhash = fullpath.parent.joinpath("by-hash", "SHA256", entry["sha256"])
-                cur.execute(INSERT, (str(byhash), entry["sha256"]))
+                register(cur, [(byhash, entry["sha256"])])
                 p, _ = fetch(args.uri, byhash, entry["SHA256"])
                 data = [
-                    (package["Filename"], package["SHA256"])
+                    (Path(package["Filename"]), package["SHA256"])
                     for package in Packages.iter_paragraphs(
                         lzma.decompress(p), use_apt_pkg=False
                     )
                 ]
-                cur.executemany(INSERT, data)
+                register(cur, data)
             case _:
                 # "Contents" indices
                 if fullpath.name.startswith("Contents"):
