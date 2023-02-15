@@ -15,7 +15,7 @@ import csv
 parser = ArgumentParser(prog="debian-release")
 parser.add_argument("--uri", default="https://mirrors.tuna.tsinghua.edu.cn/debian")
 parser.add_argument("--output", required=True)
-parser.add_argument("distributions", nargs="+")
+parser.add_argument("dists", nargs="+")
 args = parser.parse_args()
 
 
@@ -40,9 +40,9 @@ cur = con.cursor()
 cur.execute("CREATE TABLE files(filename TEXT PRIMARY KEY, sha256 TEXT)")
 INSERT = "INSERT OR IGNORE INTO files VALUES (?, ?)"
 
-for distribution in args.distributions:
+for dist in args.dists:
     # The file "dists/$DIST/InRelease" shall contain meta-information about the distribution and checksums for the indices
-    inrelease = Path("dists", distribution, "InRelease")
+    inrelease = Path("dists", dist, "InRelease")
     r, n = fetch(args.uri, inrelease)
     cur.execute(INSERT, (str(inrelease), n))
     release = Release(r)
