@@ -72,11 +72,13 @@ for distribution in args.distributions:
                 for source in Sources.iter_paragraphs(
                     lzma.decompress(p), use_apt_pkg=False
                 ):
-                    pass
-                    # print(source["Checksums-Sha256"], source["Directory"])
-                # TODO: handle sources
+                    directory = Path(source["Directory"])
+                    data = [
+                        (str(directory.joinpath(file["name"])), file["sha256"])
+                        for file in source["Checksums-Sha256"]
+                    ]
+                    cur.executemany(INSERT, data)
             case "Packages.xz":
-                continue
                 byhash = fullpath.parent.joinpath("by-hash", "SHA256", entry["sha256"])
                 cur.execute(INSERT, (str(byhash), entry["sha256"]))
                 p, _ = fetch(args.uri, byhash, entry["SHA256"])
