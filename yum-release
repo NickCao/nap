@@ -19,7 +19,10 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
 
     parser = ArgumentParser(prog="yum-release")
-    parser.add_argument("--uri", default="https://mirrors.tuna.tsinghua.edu.cn/centos-stream/9-stream/BaseOS/x86_64/os")
+    parser.add_argument(
+        "--uri",
+        default="https://mirrors.tuna.tsinghua.edu.cn/centos-stream/9-stream/BaseOS/x86_64/os",
+    )
     parser.add_argument("--output", required=True)
     args = parser.parse_args()
 
