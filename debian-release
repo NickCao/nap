@@ -151,6 +151,7 @@ for dist in args.dists:
             case (
                 # legacy per-component-and-architecture Release files
                 "Release"
+                # already handed by their compressed counterparts
                 | "Packages"
                 | "Sources"
                 # already handled by their sha256 counterparts
