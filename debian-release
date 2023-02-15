@@ -117,6 +117,21 @@ def sources(cur: sqlite3.Cursor, uri: str, entry: Entry):
         register(cur, data)
 
 
+def packages(cur: sqlite3.Cursor, uri: str, entry: Entry):
+    byhash = entry.byhash()
+    register(cur, [byhash])
+
+    content = fetch(args.uri, byhash)
+
+    data = [
+        Entry(Path(file["Filename"]), file["SHA256"])
+        for file in Packages.iter_paragraphs(
+            lzma.decompress(content), use_apt_pkg=False
+        )
+    ]
+    register(cur, data)
+
+
 # open database connection
 con = sqlite3.connect(args.output)
 cur = con.cursor()
@@ -150,15 +165,7 @@ for dist in args.dists:
             case "Sources.xz":
                 sources(cur, args.uri, entry)
             case "Packages.xz":
-                byhash = entry.byhash()
-                p = fetch(args.uri, byhash)
-                data = [
-                    Entry(Path(package["Filename"]), package["SHA256"])
-                    for package in Packages.iter_paragraphs(
-                        lzma.decompress(p), use_apt_pkg=False
-                    )
-                ]
-                register(cur, data)
+                packages(cur, args.uri, entry)
             case _:
                 # "Contents" indices
                 if entry.filename.name.startswith("Contents"):
