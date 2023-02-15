@@ -52,17 +52,46 @@ for distribution in args.distributions:
     for entry in release["SHA256"]:
         fullpath = Path("dists", distribution, entry["name"])
         cur.execute(INSERT, (str(fullpath), entry["sha256"]))
-        # handle packages
-        if fullpath.name == "Packages.xz":
-            byhash = fullpath.parent.joinpath("by-hash", "SHA256", entry["sha256"])
-            cur.execute(INSERT, (str(byhash), entry["sha256"]))
-            p, _ = fetch(args.uri, byhash, entry["SHA256"])
-            data = [
-                (package["Filename"], package["SHA256"])
-                for package in Packages.iter_paragraphs(
-                    lzma.decompress(p), use_apt_pkg=False
-                )
-            ]
-            cur.executemany(INSERT, data)
+        match fullpath.name:
+            # already handled by their xz counterparts
+            case "Packages" | "Packages.gz" | "Sources" | "Sources.gz":
+                pass
+            # legacy per arch Release
+            case "Release":
+                pass
+            # installer image sums
+            case "SHA256SUMS" | "MD5SUMS":
+                pass
+            # diff index
+            case "Index":
+                pass
+            case "Sources.xz":
+                # TODO: handle sources
+                pass
+            case "Packages.xz":
+                byhash = fullpath.parent.joinpath("by-hash", "SHA256", entry["sha256"])
+                cur.execute(INSERT, (str(byhash), entry["sha256"]))
+                p, _ = fetch(args.uri, byhash, entry["SHA256"])
+                data = [
+                    (package["Filename"], package["SHA256"])
+                    for package in Packages.iter_paragraphs(
+                        lzma.decompress(p), use_apt_pkg=False
+                    )
+                ]
+                cur.executemany(INSERT, data)
+            case _:
+                # "Contents" indices
+                if fullpath.name.startswith("Contents"):
+                    pass
+                # "Translation" indices
+                elif fullpath.name.startswith("Translation"):
+                    pass
+                # https://wiki.debian.org/DEP-11
+                elif fullpath.name.startswith("Components"):
+                    pass
+                elif fullpath.name.startswith("icons"):
+                    pass
+                else:
+                    raise Exception("unhandled file")
 con.commit()
 con.close()
