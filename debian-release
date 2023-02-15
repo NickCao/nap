@@ -93,15 +93,14 @@ for dist in args.dists:
             case (
                 # legacy per-component-and-architecture Release files
                 "Release"
-                # already handled by their xz counterparts
                 | "Packages"
-                | "Packages.gz"
                 | "Sources"
-                | "Sources.gz"
                 # already handled by their sha256 counterparts
                 | "MD5SUMS"
             ):
                 pass
+            case "Packages.gz" | "Sources.gz":
+                register(cur, [entry.byhash()])
             # installer image sums
             case "SHA256SUMS":
                 p = fetch(args.uri, entry)
