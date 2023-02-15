@@ -14,6 +14,12 @@ import csv
 import logging
 import xml
 
+def sha256sum(data: bytes) -> str:
+    hasher = hashlib.sha256()
+    hasher.update(data)
+    return hasher.hexdigest()
+
+
 uri = "https://mirrors.tuna.tsinghua.edu.cn/centos-stream/9-stream/BaseOS/x86_64/os"
 resp = requests.get(f"{uri}/repodata/repomd.xml")
 resp.raise_for_status()
@@ -22,8 +28,28 @@ ns = {"repo": "http://linux.duke.edu/metadata/repo"}
 root = ET.fromstring(resp.text)
 
 for data in root.findall("repo:data", ns):
-    location = data.find("repo:location", ns)
-    checksum = data.find("repo:checksum", ns)
-    print(data.get("type"))
-    print(location.get("href"))
-    print(checksum.text)
+    filetype = data.get("type")
+    filename = data.find("repo:location", ns).get("href")
+    checksum = data.find("repo:checksum", ns).text
+
+    match filetype:
+        case "primary_db":
+            resp = requests.get(f"{uri}/{filename}")
+            resp.raise_for_status()
+            con = sqlite3.connect(":memory:")
+            con.deserialize(lzma.decompress(resp.content))
+        case "filelists_db":
+            resp = requests.get(f"{uri}/{filename}")
+            resp.raise_for_status()
+            con = sqlite3.connect(":memory:")
+            con.deserialize(lzma.decompress(resp.content))
+        case "other_db":
+            resp = requests.get(f"{uri}/{filename}")
+            resp.raise_for_status()
+            con = sqlite3.connect(":memory:")
+            con.deserialize(lzma.decompress(resp.content))
+        case _:
+            pass
+
+    print(filename)
+    print(checksum)
