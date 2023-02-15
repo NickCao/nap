@@ -76,14 +76,32 @@ def inrelease(cur: sqlite3.Cursor, uri: str, dist: str) -> list[Entry]:
     ]
 
 
-def installer(cur: sqlite3.Cursor, entry: Entry):
-    content = fetch(args.uri, entry)
+def installer(cur: sqlite3.Cursor, uri: str, entry: Entry):
+    content = fetch(uri, entry)
     data = [
         Entry(entry.filename.parent.joinpath(row[2]), row[0])
         for row in csv.reader(content.decode("utf-8").splitlines(), delimiter=" ")
     ]
     print(data)
     register(cur, data)
+
+
+def diff(cur: sqlite3.Cursor, uri: str, entry: Entry):
+    byhash = entry.byhash()
+    register(cur, [byhash])
+
+    content = fetch(uri, byhash)
+
+    for para in PdiffIndex.iter_paragraphs(content, use_apt_pkg=False):
+        data = [
+            Entry(
+                entry.filename.parent.joinpath(file["filename"]),
+                file["SHA256"],
+            )
+            for file in para["SHA256-Download"]
+        ]
+        print(data)
+        register(cur, data)
 
 
 # open database connection
@@ -113,20 +131,9 @@ for dist in args.dists:
                 register(cur, [entry.byhash()])
             # installer image sums
             case "SHA256SUMS":
-                installer(cur, entry)
+                installer(cur, args.uri, entry)
             case "Index":
-                byhash = entry.byhash()
-                register(cur, [byhash])
-                p = fetch(args.uri, byhash)
-                for diff in PdiffIndex.iter_paragraphs(p, use_apt_pkg=False):
-                    data = [
-                        Entry(
-                            entry.filename.parent.joinpath(file["filename"]),
-                            file["SHA256"],
-                        )
-                        for file in diff["SHA256-Download"]
-                    ]
-                    register(cur, data)
+                diff(cur, args.uri, entry)
             case "Sources.xz":
                 byhash = entry.byhash()
                 register(cur, [byhash])
