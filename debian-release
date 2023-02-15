@@ -82,12 +82,13 @@ INSERT = "INSERT OR IGNORE INTO files VALUES (?, ?)"
 
 for dist in args.dists:
     release = inrelease(cur, args.uri, dist)
+    print(release)
+    exit(0)
     register(cur, release)
 
     # handle toplevel files
     for entry in release:
-        fullpath = entry.filename
-        match fullpath.name:
+        match entry.filename.name:
             case (
                 # legacy per-component-and-architecture Release files
                 "Release"
@@ -104,7 +105,9 @@ for dist in args.dists:
             case "SHA256SUMS":
                 p = fetch(args.uri, entry)
                 for row in csv.reader(p.decode("utf-8").splitlines(), delimiter=" "):
-                    register(cur, [Entry(fullpath.parent.joinpath(row[2]), row[0])])
+                    register(
+                        cur, [Entry(entry.filename.parent.joinpath(row[2]), row[0])]
+                    )
             case "Index":
                 byhash = entry.byhash()
                 register(cur, [byhash])
@@ -112,7 +115,7 @@ for dist in args.dists:
                 for diff in PdiffIndex.iter_paragraphs(p, use_apt_pkg=False):
                     data = [
                         Entry(
-                            fullpath.parent.joinpath(file["filename"]),
+                            entry.filename.parent.joinpath(file["filename"]),
                             file["SHA256"],
                         )
                         for file in diff["SHA256-Download"]
@@ -143,15 +146,15 @@ for dist in args.dists:
                 register(cur, data)
             case _:
                 # "Contents" indices
-                if fullpath.name.startswith("Contents"):
+                if entry.filename.name.startswith("Contents"):
                     pass
                 # "Translation" indices
-                elif fullpath.name.startswith("Translation"):
+                elif entry.filename.name.startswith("Translation"):
                     pass
                 # https://wiki.debian.org/DEP-11
-                elif fullpath.name.startswith("Components"):
+                elif entry.filename.name.startswith("Components"):
                     pass
-                elif fullpath.name.startswith("icons"):
+                elif entry.filename.name.startswith("icons"):
                     pass
                 else:
                     raise Exception("unhandled file")
