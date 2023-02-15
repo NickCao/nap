@@ -82,7 +82,6 @@ def installer(cur: sqlite3.Cursor, uri: str, entry: Entry):
         Entry(entry.filename.parent.joinpath(row[2]), row[0])
         for row in csv.reader(content.decode("utf-8").splitlines(), delimiter=" ")
     ]
-    print(data)
     register(cur, data)
 
 
@@ -100,7 +99,21 @@ def diff(cur: sqlite3.Cursor, uri: str, entry: Entry):
             )
             for file in para["SHA256-Download"]
         ]
-        print(data)
+        register(cur, data)
+
+
+def sources(cur: sqlite3.Cursor, uri: str, entry: Entry):
+    byhash = entry.byhash()
+    register(cur, [byhash])
+
+    content = fetch(args.uri, byhash)
+
+    for para in Sources.iter_paragraphs(lzma.decompress(content), use_apt_pkg=False):
+        directory = Path(para["Directory"])
+        data = [
+            Entry(directory.joinpath(file["name"]), file["sha256"])
+            for file in para["Checksums-Sha256"]
+        ]
         register(cur, data)
 
 
@@ -135,18 +148,7 @@ for dist in args.dists:
             case "Index":
                 diff(cur, args.uri, entry)
             case "Sources.xz":
-                byhash = entry.byhash()
-                register(cur, [byhash])
-                p = fetch(args.uri, byhash)
-                for source in Sources.iter_paragraphs(
-                    lzma.decompress(p), use_apt_pkg=False
-                ):
-                    directory = Path(source["Directory"])
-                    data = [
-                        Entry(directory.joinpath(file["name"]), file["sha256"])
-                        for file in source["Checksums-Sha256"]
-                    ]
-                    register(cur, data)
+                sources(cur, args.uri, entry)
             case "Packages.xz":
                 byhash = entry.byhash()
                 p = fetch(args.uri, byhash)
