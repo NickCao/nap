@@ -23,10 +23,8 @@
             hash = "sha256-YVLp+rWqrjHfxedfgnsWj8WLvL0Ra9jQxrKqtCL7Y88=";
           };
           devShells.default = pkgs.mkShell {
-            nativeBuildInputs = with pkgs;[
-              cargo
-              rustc
-              (python311.withPackages (ps: with ps;[ debian requests ]))
+            nativeBuildInputs = [
+              (pkgs.python311.withPackages (ps: with ps;[ debian requests ]))
             ];
           };
         });
