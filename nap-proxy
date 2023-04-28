@@ -7,28 +7,36 @@ import requests
 
 app = Flask(__name__)
 
+
 def get_db():
-    db = getattr(g, '_database', None)
+    db = getattr(g, "_database", None)
     if db is None:
         db = g._database = sqlite3.connect("/tmp/bookworm.db")
-        g._url = db.cursor().execute("SELECT value FROM metadata WHERE key = \"uri\"").fetchone()[0]
+        g._url = (
+            db.cursor()
+            .execute('SELECT value FROM metadata WHERE key = "uri"')
+            .fetchone()[0]
+        )
     return (db, g._url)
+
 
 @app.teardown_appcontext
 def close_connection(exception):
-    db = getattr(g, '_database', None)
+    db = getattr(g, "_database", None)
     if db is not None:
         db.close()
+
 
 @app.route("/<path:subpath>")
 def proxy(subpath):
     db, url = get_db()
-    resp = requests.get(f'{url}/{subpath}')
+    resp = requests.get(f"{url}/{subpath}")
     cur = db.cursor()
     cur.execute("SELECT sha256 FROM files WHERE filename = ?", (subpath,))
     row = cur.fetchone()
-    if row == None:
+    if row is None:
         abort(404)
     return Response(resp.content, resp.status_code)
+
 
 app.run()
