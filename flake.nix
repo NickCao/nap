@@ -24,7 +24,7 @@
           };
           devShells.default = pkgs.mkShell {
             nativeBuildInputs = [
-              (pkgs.python311.withPackages (ps: with ps;[ debian requests ]))
+              (pkgs.python311.withPackages (ps: with ps;[ debian requests flask ]))
             ];
           };
         });
