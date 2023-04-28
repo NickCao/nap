@@ -152,7 +152,12 @@ if __name__ == "__main__":
     cur = con.cursor()
     # create mapping table
     cur.execute("CREATE TABLE files(filename TEXT PRIMARY KEY, sha256 TEXT)")
+    cur.execute("CREATE TABLE metadata(key TEXT PRIMARY KEY, value TEXT)")
+
     INSERT = "INSERT OR IGNORE INTO files VALUES (?, ?)"
+    INSERTMETA = "INSERT OR IGNORE INTO metadata VALUES (?, ?)"
+
+    cur.execute(INSERTMETA, ["uri", args.uri])
 
     for dist in args.dists:
         release = inrelease(cur, args.uri, dist)
